@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.io import loadmat
 
+
 def create_weights(net_dims, weight_type):
     # Create cell of weights for neural network with given dimensions
     #
@@ -16,20 +17,20 @@ def create_weights(net_dims, weight_type):
     W = [None]*num_layers
     for i in range(num_layers):
         if weight_type == 'ones':
-            W[i] = ones(net_dims(i+1), net_dims(i))
-            
+            W[i] = np.ones(net_dims(i+1), net_dims(i))
+
         elif weight_type == 'rand':
             W[i] = (1 / np.sqrt(num_layers)) * np.random.randn(net_dims(i+1), net_dims(i))
-            
+
         else:
             raise ValueError('[ERROR]: Please use weight_type in ["ones", "rand"]\n')
-       
+
     return W
 
 
 def load_weights(path):
     # Load weights from given path and extract network dimensions
-    # 
+    #
     # params:
     #   * path: str - path of saved neural network weights
     #
@@ -42,7 +43,7 @@ def load_weights(path):
     dat = loadmat(path)
     weights = dat['weights'] # this is a numpy array of size (1,n_weights)
     weights = weights[0,:].tolist()
-    
+
     # extract network dimensions from weights
     net_dims = [weights[0].shape[1]]
     for i in range(len(weights)):
@@ -66,20 +67,20 @@ def split_weights(weights, net_dims, split_amount):
 
     # number of weights in neural network
     num_weights = len(weights)
-    
+
     split_w = []
     split_net_dims = []
-    
+
     counter = 1
     for k in range(0, num_weights, split_amount):
-        
+
         # get ending index of split
         next_max_idx = k + split_amount - 1
-        
+
         # if we exceed the total number of weights, cut this one short
         if next_max_idx > num_weights:
             next_max_idx = num_weights
-        
+
         # add split section of weights to cell
         split_w.append(weights[k : next_max_idx + 1])
         split_net_dims.append(net_dims[k : next_max_idx + 2])

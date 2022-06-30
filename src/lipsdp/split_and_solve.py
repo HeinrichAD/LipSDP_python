@@ -1,10 +1,11 @@
-import numpy as np
-import multiprocessing
+import cvxpy as cp
 from itertools import repeat
+import multiprocessing
+import numpy as np
 
-import lipschitz_multi_layer
+from . import lipschitz_multi_layer
 
-def compute_L_split(k, split_W, split_net_dims, mode, verbose, num_rand_neurons, num_dec_vars, network):
+def compute_L_split(k, split_W, split_net_dims, mode, verbose, num_rand_neurons, num_dec_vars, network, solver=cp.CVXOPT):
     # compute Lipschitz constant of a subnetwork after splitting
 
     curr_weights = split_W[k]
@@ -13,7 +14,7 @@ def compute_L_split(k, split_W, split_net_dims, mode, verbose, num_rand_neurons,
     if len(curr_weights) > 1:
         Lf_reduced_piece = lipschitz_multi_layer.lipschitz_multi_layer(
             curr_weights, mode, verbose, num_rand_neurons, num_dec_vars,
-            curr_net_dims, network)
+            curr_net_dims, network, solver)
 
     # if there is only one matrix in this layer, just
     # multiply by the norm of that matrix
@@ -23,14 +24,14 @@ def compute_L_split(k, split_W, split_net_dims, mode, verbose, num_rand_neurons,
     return Lf_reduced_piece
 
 
-def split_and_solve(split_W, split_net_dims, lip_params, network):
+def split_and_solve(split_W, split_net_dims, lip_params, network, solver=cp.CVXOPT):
     # Compute Lipschitz constant as product of constants from subnetworks
     # Can be run in parallel by specifying parallel and num_workers flags
     # in lip_params struct
     #
     # params:
-    #   * split_W: list         - weights for each subnetwork
-    #   * split_net_dims: list  - dimensions of layers in each subnetwork
+    #   * split_W: list             - weights for each subnetwork
+    #   * split_net_dims: list      - dimensions of layers in each subnetwork
     #   * network: dictionary       - data describing neural network
     #       - fields:
     #           (1) alpha: float            - slope-restricted lower bound
@@ -39,7 +40,7 @@ def split_and_solve(split_W, split_net_dims, lip_params, network):
     #   * lip_params: dictionary    - parameters for LipSDP
     #       - fields:
     #           (1) formulation: str    - LipSDP formulation to use
-    #           (2) split: logical      - if true, use splitting 
+    #           (2) split: logical      - if true, use splitting
     #           (3) parallel: logical   - if true, parallelize splitting
     #           (4) verbose: logical    - if true, print CVX output
     #           (5) split_size: int     - size of subnetwork for splitting
@@ -49,6 +50,7 @@ def split_and_solve(split_W, split_net_dims, lip_params, network):
     #                                     ization of splitting formulations
     #           (8) num_dec_vars: int   - number of decision variables for
     #                                     LipSDP-Network-Dec-Vars
+    #   * solver : str, optional    - solver to use
     #
     # returns:
     #   * lip_prod: float - Lipschitz constant found by splitting network
@@ -58,7 +60,7 @@ def split_and_solve(split_W, split_net_dims, lip_params, network):
 
     # number of subnetworks after splitting
     num_splits = len(split_W)
-    
+
     # unpack variables from lip_params
     mode = lip_params['formulation']
     verbose = lip_params['verbose']
@@ -66,18 +68,18 @@ def split_and_solve(split_W, split_net_dims, lip_params, network):
     num_dec_vars = lip_params['num_dec_vars']
 
     # parallel
-    # for loop is parallelizable 
+    # for loop is parallelizable
     if lip_params['parallel']:
         pool = multiprocessing.Pool(processes=lip_params['num_workers'])
         Lf_reduced_pieces = pool.starmap(
             compute_L_split, zip(range(num_splits), repeat(split_W),
             repeat(split_net_dims), repeat(mode), repeat(verbose),
-            repeat(num_rand_neurons), repeat(num_dec_vars), repeat(network)))
+            repeat(num_rand_neurons), repeat(num_dec_vars), repeat(network), repeat(solver)))
         pool.close()
         pool.join()
         lip_prod = np.prod(Lf_reduced_pieces)
 
-    # not parallel 
+    # not parallel
     else:
         # initialize Lipschitz constant of network
         lip_prod = 1
@@ -85,7 +87,7 @@ def split_and_solve(split_W, split_net_dims, lip_params, network):
 
             Lf_reduced_piece = compute_L_split(
                 k, split_W, split_net_dims, mode, verbose, num_rand_neurons,
-                num_dec_vars, network)
+                num_dec_vars, network, solver)
 
             # update product
             lip_prod = lip_prod * Lf_reduced_piece

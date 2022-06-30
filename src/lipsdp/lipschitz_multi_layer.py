@@ -1,12 +1,12 @@
-import math
-import itertools
-import numpy as np
 import cvxpy as cp
+import itertools
+import math
+import numpy as np
 import scipy as sp
 from scipy.linalg import block_diag
-import mosek
 
-import error_messages
+from . import error_messages
+
 
 def block_diag(arr_list):
     # create a block diagonal matrix from a list of cvxpy matrices
@@ -43,17 +43,17 @@ def block_diag(arr_list):
 
 
 def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
-                          num_dec_vars, net_dims, network):
+                          num_dec_vars, net_dims, network, solver=cp.CVXOPT):
     # Computes Lipschitz constant of NN using LipSDP formulation
     # mode parameter is used to select which formulation of LipSDP to use
     #
     # params:
     #   * weights: cell          - weights of neural network in cell array
     #   * mode: str              - LipSDP formulation in ['network',
-    #                             'neuron','layer','network-rand', 
+    #                             'neuron','layer','network-rand',
     #                              'network-dec-vars']
     #   * verbose: logical       - if true, prints CVX output from solve
-    #   * num_rand_neurons: int  - num of neurons to couple in 
+    #   * num_rand_neurons: int  - num of neurons to couple in
     #                              LipSDP-Network-rand
     #   * num_dec_vars: int      - num of decision variables for
     #                              LipSDP-Network-Dec-Vars
@@ -63,7 +63,8 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
     #           (1) alpha: float            - slope-restricted lower bound
     #           (2) beta: float             - slope-restricted upper bound
     #           (3) weight_path: str        - path of saved weights of NN
-    #                                         
+    #   * solver : str, optional - solver to use
+    #
     # returns:
     #   * L: float - Lipschitz constant of neural network
     # ---------------------------------------------------------------------
@@ -79,7 +80,7 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
     # LipSDP-Network - one variable for each of the (N choose 2) neurons in
     # the network to parameterize T matrix.  This mode has complexity O(N^2)
     if mode == 'network':
-        
+
         D = cp.Variable(shape=(N, 1), nonneg=True)
         zeta = cp.Variable(shape=(math.comb(N, 2), 1), nonneg=True)
 
@@ -91,7 +92,7 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
     # LipSDP-Network-Rand uses repeated nonlinearities with a random subset
     # of coupled neurons from the entire set of N choose 2 total neurons
     elif mode == 'network-rand':
-        
+
         # cap number of random neurons
         num_rand_neurons = error_messages.cap_input(num_rand_neurons, N, 'randomly chosen neurons')
 
@@ -108,19 +109,19 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
         # form T matrix using these randomly chosen neurons
         E = id[:, C[:, 0]] - id[:, C[:, 1]]
         T = T + E @ cp.diag(zeta) @ E.T
-        
+
     # LipSDP-Network-Dec-Vars - uses repeated nonlinearities with a
     # spcified number of decision variables spaced out equally
     elif mode == 'network-dec-vars':
-        
+
         # cap number of decision variables
         num_dec_vars = error_messages.cap_input(num_dec_vars, N, 'decision variables')
-        
+
         D = cp.Variable(shape=(N, 1), nonneg=True)
-        
+
         T = cp.diag(D)
         C = np.array(list(itertools.combinations(range(0,N), 2)))
-        
+
         # space out decision variables in couplings
         spacing = int(np.ceil(math.comb(N, 2) / num_dec_vars))
         C = C[0::spacing, :]
@@ -131,7 +132,7 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
         E = id[:, C[:, 0]] - id[:, C[:, 1]]
         T = T + E @ cp.diag(zeta) @ E.T
 
-    # LipSDP-Neuron - one CVX variable per hidden neuron in the network to 
+    # LipSDP-Neuron - one CVX variable per hidden neuron in the network to
     # parameterize T matrix.  This mode has complexity O(N).
     elif mode == 'neuron':
 
@@ -155,11 +156,11 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
     # If mode is not valid, raise error
     else:
         invalid_mode(mode)
-       
-    
+
+
     # Create Q matrix, which is parameterized by T, which in turn depends
-    # on the chosen LipSDP formulation 
-    Q = cp.bmat([[-2 * alpha * beta * T, (alpha + beta) * T], 
+    # on the chosen LipSDP formulation
+    Q = cp.bmat([[-2 * alpha * beta * T, (alpha + beta) * T],
                  [(alpha + beta) * T, -2 * T]])
 
     # Create A term in Lipschitz formulation
@@ -186,7 +187,7 @@ def lipschitz_multi_layer(weights, mode, verbose, num_rand_neurons,
 
     obj = cp.Minimize(L_sq)
     prob = cp.Problem(obj, [(A_on_B.T @ Q @ A_on_B) - M << 0])
-    prob.solve(solver=cp.MOSEK, verbose=verbose)
+    prob.solve(solver=solver, verbose=verbose)
 
     L = np.sqrt(prob.value)
 

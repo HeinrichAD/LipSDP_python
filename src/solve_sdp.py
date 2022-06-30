@@ -1,19 +1,23 @@
+#!/usr/bin/env python3
 import argparse
-import numpy as np
-from scipy.io import savemat
-import os
+import logging
 from time import time
 
-import solve_LipSDP
+from lipsdp.solve_LipSDP import solve_LipSDP
+from lipsdp.weight_utils import load_weights
+
 
 def main(args):
 
     start_time = time()
 
+    weights, net_dims = load_weights(args.weight_path)
+
     network = {
         'alpha': args.alpha,
         'beta': args.beta,
-        'weight_path': args.weight_path,
+        'weights': weights,
+        'net_dims': net_dims
     }
 
     lip_params = {
@@ -21,18 +25,21 @@ def main(args):
         'split': args.split,
         'parallel': args.parallel,
         'verbose': args.verbose,
+        'solver': args.solver,
         'split_size': args.split_size,
         'num_neurons': args.num_neurons,
         'num_workers': args.num_workers,
-        'num_dec_vars': args.num_decision_vars
+        'num_dec_vars': args.num_decision_vars,
     }
 
-    L = solve_LipSDP.solve_LipSDP(network, lip_params)
+    L = solve_LipSDP(network, lip_params)
     print(f'LipSDP-{args.form.capitalize()} gives a Lipschitz constant of {L:.3f}')
     print(f'Total time: {float(time() - start_time):.5} seconds')
 
 
 if __name__ == '__main__':
+    logging.getLogger('lipsdp').setLevel(logging.INFO)
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--form',
@@ -88,6 +95,11 @@ if __name__ == '__main__':
         type=str,
         required=True,
         help='path of weights corresponding to trained neural network model')
+
+    parser.add_argument('--solver',
+        type=str,
+        default="CVXOPT",
+        help='solver to use')
 
     args = parser.parse_args()
 

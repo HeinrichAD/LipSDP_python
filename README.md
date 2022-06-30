@@ -1,12 +1,63 @@
 # LipSDP - Python
 
-## !!!!!!!!!!!!!!!!!!!!
+> This is the original LipSDP repo converted to run purely in Python (i.e. no Matlab). Instead of `CVX`, this code uses `cvxpy`. All of the instructions given in the original README work the same with repo. Note that due to cvxpy's interface to Mosek, you may get Mosek "Out of space" errors running some of the examples in the README file. These errors seem to be resolved by using a different solver (e.g. change `MOSEK` to `CVXOPT` or something else).
 
-## This is the original LipSDP repo converted to run purely in Python (i.e. no Matlab). Instead of `CVX`, this code uses `cvxpy`. All of the instructions given in the original README work the same with repo. Note that due to cvxpy's interface to Mosek, you may get Mosek "Out of space" errors running some of the examples in the README file. These errors seem to be resolved by using a different solver (e.g. change `MOSEK` to `CVXOPT` or something else).
+> DISCLAIMER: I am not affiliated with the original LipSDP paper or repo
 
-## DISCLAIMER: I am not affiliated with the original LipSDP paper or repo
+---
 
-## !!!!!!!!!!!!!!!!!!!!
+## Requirements
+- python 3.7 or later  
+  `which python3.7`
+- virtualenv or venv  
+  `pip install -U virtualenv`
+
+
+## Installation
+
+```bash
+pip install -U "git+https://github.com/HeinrichAD/LipSDP_python.git@master"
+```
+
+setup.py
+```bash
+...
+install_requires=[
+    ...
+    "lipsdp @ git+https://github.com/HeinrichAD/LipSDP_python.git@master",
+    ...
+],
+...
+```
+
+### Development
+
+```bash
+# create virtual environment
+virtualenv -p $(which python3.7) .venv
+# or
+python -m venv .venv
+
+# activate our virtual environment:
+source .venv/bin/activate
+
+# update pip (optional)
+python -m pip install -U pip
+
+# install
+pip install -e .[dev]
+```
+
+## Simple example
+
+```bash
+./src/solve_sdp.py --form neuron --weight-path src/examples/saved_weights/random_weights.mat
+```
+```
+LipSDP-Neuron gives a Lipschitz constant of 36.482
+```
+
+---
 ---
 
 This repository contains code for the Lipschitz constant estimation semidefinite programming framework introduced in [LipSDP](https://arxiv.org/abs/1906.04893) by Mahyar Fazlyab, Alexander Robey, Hamed Hassani, Manfred Morari, and George J. Pappas.  This work will appear as a conference paper at NeurIPS 2019.
